@@ -1,5 +1,5 @@
 # eventdispatcher
-eventdispatcher written by golang
+event dispatcher written by golang
 
 # Usage
 
