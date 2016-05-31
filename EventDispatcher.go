@@ -7,22 +7,38 @@ import (
 type CallbackFunc func(interface{})
 
 type listener struct {
-	callback CallbackFunc
-	id       int
-	priority uint32
+	callback    CallbackFunc
+	id          int
+	deleteFlag  bool
+	runningFlag bool
 }
 
 type eventListenerList struct {
 	listeners *list.List
+	running   bool
 }
 
 func (this *eventListenerList) call(data interface{}) int {
 	count := 0
-	for fr := this.listeners.Front(); fr != nil; fr = fr.Next() {
-		lis, ok := fr.Value.(listener)
+
+	for fr := this.listeners.Front(); fr != nil; {
+		lis, ok := fr.Value.(*listener)
 		if ok {
+			lis.runningFlag = true
 			lis.callback(data)
+			lis.runningFlag = false
+
+			//	test deleted?
+			if lis.deleteFlag {
+				nextNode := fr.Next()
+				this.listeners.Remove(fr)
+				fr = nextNode
+			} else {
+				fr = fr.Next()
+			}
 			count++
+		} else {
+			fr = fr.Next()
 		}
 	}
 
@@ -33,15 +49,20 @@ func (this *eventListenerList) add(id int, cb CallbackFunc) {
 	var lis listener
 	lis.id = id
 	lis.callback = cb
-	this.listeners.PushBack(lis)
+	this.listeners.PushBack(&lis)
 }
 
 func (this *eventListenerList) remove(id int) bool {
 	for fr := this.listeners.Front(); fr != nil; fr = fr.Next() {
-		lis, ok := fr.Value.(listener)
+		lis, ok := fr.Value.(*listener)
 		if ok {
 			if lis.id == id {
-				this.listeners.Remove(fr)
+				//	If the listener list is running, delete it later
+				if lis.runningFlag {
+					lis.deleteFlag = true
+				} else {
+					this.listeners.Remove(fr)
+				}
 				return true
 			}
 		}
